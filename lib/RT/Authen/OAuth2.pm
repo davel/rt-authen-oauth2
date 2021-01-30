@@ -41,9 +41,15 @@ May need root permissions
 
 =item Edit your F</opt/rt4/etc/RT_SiteConfig.pm>
 
-Add this line:
+If you are using RT 4.2 or greater, add this line:
 
     Plugin('RT::Authen::OAuth2');
+
+For RT 4.0, add this line:
+
+    Set(@Plugins, qw(RT::Authen::OAuth2));
+
+or add C<RT::Authen::OAuth2> to your existing C<@Plugins> line.
 
 =item Add / Edit OAuth2 configs found in OAuth2_Config.pm
 
@@ -79,9 +85,8 @@ This is free software, licensed under:
 
 =cut
 
-=head1 METHODS
 
-=head2 C<RequestAuthorization()>
+=item C<RequestAuthorization()>
 
 =over 4
 
@@ -118,7 +123,7 @@ sub RequestAuthorization {
 }
 
 
-=head2 C<LogUserIn()>
+=item C<LogUserIn()>
 
 =over 4
 
@@ -164,45 +169,47 @@ sub LogUserIn {
     # Get the correct handler for the user's metadata, based on which IDP is in use
     my $idp_handler = $idp_conf->{MetadataHandler};
     my $metadata = $idp_handler->Metadata($response->decoded_content);
-    my $loadcol = $idp_conf->{LoadColumn} || 'EmailAddress';
-    my $name = $metadata->{ $idp_conf->{MetadataMap}->{$loadcol} };
+    my $email = $metadata->{ $idp_conf->{MetadataMap}->{EmailAddress} };
 
     # email is used to identify the user; bail out if we don't have one
-    RT::Logger->info("OAuth2 server return content didn't include $loadcol, aborting. Request from $ip") unless $name;
-    return (0, $generic_error) unless $name;
+    RT::Logger->info("OAuth2 server return content didn't include email, aborting. Request from $ip") unless $email;
+    return (0, $generic_error) unless $email;
 
-    if ( $idp_conf->{MetadataMap}->{VerifiedEmail} && !$metadata->{ $idp_conf->{MetadataMap}->{VerifiedEmail} } ) {
-      RT::Logger->info( "Email $name not verified." );
-      return ( 0, RT->SystemUser->loc( "Email [_1] not verified.", $name ) );
+    # TODO: make requiring a verified email an option.
+    unless ($metadata->{ $idp_conf->{MetadataMap}->{VerifiedEmail} }) {
+      RT::Logger->info("Email $email not verified.") unless $email;
+      return (0, RT->SystemUser->loc("Email [_1] not verified.", $email));
     }
 
     my $user = RT::User->new( RT->SystemUser );
-    $user->LoadByCol($loadcol, $name);
+    $user->LoadByEmail($email);
 
     # TODO future feature: add an option to auto-vivify only if email matches regex
     # TODO e.g., allow all people from mycompany.com to access RT automatically
 
-    RT::Logger->info("OAuth2 user $name attempted login but no matching user found in RT. Request from $ip") unless $user->id;
+    RT::Logger->info("OAuth2 user $email attempted login but no matching user found in RT. Request from $ip") unless $user->id;
     if (RT->Config->Get('OAuthCreateNewUser') and not $user->id) {
       my $additional = RT->Config->Get('OAuthNewUserOptions') || { Privileged => 1 };
       my $newuser = RT::User->new( $RT::SystemUser );
-      RT::Logger->info("Attempting to create account for $name");
-      my ( $id, $msg ) = $newuser->Create(
+      my $name = $metadata->{ $idp_conf->{MetadataMap}->{RealName} };
+      RT::Logger->info("Attempting to create account for $name <$email>");
+      # TODO: Allow using 'nickname' as account name.  Requires
+      # testing for existence and fallback to email.
+      my ($id, $msg) = $newuser->Create(
         %$additional,
-        Name => $name,
-        map { $_ => $metadata->{ $idp_conf->{MetadataMap}->{$_} } }
-          grep { $metadata->{ $idp_conf->{MetadataMap}->{$_} } }
-          qw(RealName NickName Organization Lang EmailAddress),
+        Name         => $email,
+        RealName     => $name,
+        EmailAddress => $email,
       );
       unless ($id) {
-        RT::Logger->info("Error $msg creating account for $name");
+        RT::Logger->info("Error $msg creating account for $name <$email>");
         return (0, $generic_error);
       }
       $user = $newuser;
     }
     return(0, $generic_error) unless $user->id;
 
-    RT::Logger->info("OAuth2 user $name is disabled in RT; aborting OAuth2 login. Request from $ip") if $user->PrincipalObj->Disabled;
+    RT::Logger->info("OAuth2 user $email is disabled in RT; aborting OAuth2 login. Request from $ip") if $user->PrincipalObj->Disabled;
     return(0, $generic_error) if $user->PrincipalObj->Disabled;
 
     # Populate any empty fields in the RT user profile from the OAuth server metadata
@@ -217,14 +224,14 @@ sub LogUserIn {
     );
 
     # Set up our session and return to the handler template element for the redirect
-    RT::Logger->info("Successful OAuth2 login for $name from $ip");
+    RT::Logger->info("Successful OAuth2 login for $email from $ip");
     RT::Interface::Web::InstantiateNewSession();
     $session->{CurrentUser} = RT::CurrentUser->new($user);
     return (1, "ok", $args->{state});
 }
 
 
-=head2 C<IDPLoginButtonImage()>
+=item C<IDPLoginButtonImage()>
 
 =over 4
 
@@ -241,7 +248,7 @@ sub IDPLoginButtonImage {
     return RT->Config->Get('OAuthIDPs')->{$idp}->{LoginPageButton};
 }
 
-=head2 C<LogOutURL()>
+=item C<LogOutURL()>
 
 =over 4
 

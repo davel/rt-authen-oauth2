@@ -105,8 +105,6 @@ found in the C<%OAuthIDPs> internal config option.
 
 =cut
 
-Set( %OAuthIDPSecrets, () );
-
 
 =head1 INTERNAL CONFIGURATION DEFAULTS
 
@@ -158,8 +156,7 @@ Set(%OAuthIDPs,
             Lang => 'locale',
             Organization => 'hd',
         },
-        'LoadColumn' => 'EmailAddress',
-        'LoginPageButton' => '/static/images/btn_google_signin_dark_normal_web.png',
+        'LoginPageButton' => '/NoAuth/images/btn_google_signin_dark_normal_web.png',
         'authorize_path' => '/o/oauth2/auth',
         'site' => 'https://accounts.google.com',
         'name' => 'Google Login',
@@ -181,7 +178,7 @@ Set(%OAuthIDPs,
             Organization => 'not-provided',
             VerifiedEmail => 'email_verified',
         },
-        'LoginPageButton' => '/static/images/btn_auth0_signin.png',
+        'LoginPageButton' => '/NoAuth/images/btn_auth0_signin.png',
         'authorize_path' => '/authorize',
         'site' => 'https://' . RT->Config->Get('Auth0Host'),
         'logout_path' => '/v2/logout?returnTo=__NEXT__&client_id=' . RT->Config->Get('OAuthIDPSecrets')->{'auth0'}->{'client_id'},

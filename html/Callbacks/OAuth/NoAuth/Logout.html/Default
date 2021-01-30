@@ -2,7 +2,7 @@
 $URL => undef
 </%ARGS>
 <%INIT>
-# In RT 4.0, there are two Default callbacks. We want the one with $URL.
+# There are two Default callbacks. We want the one with $URL.
 return unless $URL;
 return unless RT->Config->Get('EnableOAuth2');
 

@@ -15,5 +15,13 @@ RT::Interface::Web::Redirect($next) if $next and $good;
     titlebox => { class => 'error', hideable => 0 },
     actions => $actions
 &>
+
+% if (exists $ARGS{error_description}) {
+<&| /Widgets/TitleBox, title => loc('Error') &>
+<p>Error: <% $ARGS{error} %></p>
+<p><% $ARGS{error_description} %></p>
+</&>
+% }
+
 <a href="<% RT->Config->Get('WebURL')%>"><&|/l&>Go Home</&></a>
 </div>

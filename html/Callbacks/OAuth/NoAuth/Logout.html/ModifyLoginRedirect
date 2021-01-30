@@ -1,8 +1,0 @@
-<%ARGS>
-$URL
-</%ARGS>
-<%INIT>
-return unless RT->Config->Get('EnableOAuth2');
-
-$$URL = RT::Authen::OAuth2::LogoutURL( RT->Config->Get("WebURL") );
-</%INIT>
